@@ -1,59 +1,120 @@
 package com.example.juegodecolores
 
 import android.os.Bundle
+import android.os.CountDownTimer
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
+import androidx.navigation.fragment.findNavController
+import android.media.AudioAttributes
+import android.media.SoundPool
+import android.view.animation.AnimationUtils
+import com.example.juegodecolores.databinding.FragmentGameBinding
 
-// TODO: Rename parameter arguments, choose names that match
-// the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
-private const val ARG_PARAM1 = "param1"
-private const val ARG_PARAM2 = "param2"
-
-/**
- * A simple [Fragment] subclass.
- * Use the [GameFragment.newInstance] factory method to
- * create an instance of this fragment.
- */
 class GameFragment : Fragment() {
-    // TODO: Rename and change types of parameters
-    private var param1: String? = null
-    private var param2: String? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        arguments?.let {
-            param1 = it.getString(ARG_PARAM1)
-            param2 = it.getString(ARG_PARAM2)
-        }
-    }
+    private var _binding: FragmentGameBinding? = null
+    private val binding get() = _binding!!
+
+    private var score = 0
+    private lateinit var timer: CountDownTimer
+
+    private lateinit var soundPool: SoundPool
+    private var idSonidoAcierto: Int = 0
+    private var idSonidoError: Int = 0
+
+    // definimos una lista de los colores (desde colors.xml) que usaremos
+    private val gameColors = listOf(
+        R.color.game_red,
+        R.color.game_green,
+        R.color.game_blue,
+        R.color.game_yellow
+    )
+    private var currentColorId: Int = 0
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
-        // Inflate the layout for this fragment
-        return inflater.inflate(R.layout.fragment_game, container, false)
+    ): View {
+        _binding = FragmentGameBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
-    companion object {
-        /**
-         * Use this factory method to create a new instance of
-         * this fragment using the provided parameters.
-         *
-         * @param param1 Parameter 1.
-         * @param param2 Parameter 2.
-         * @return A new instance of fragment GameFragment.
-         */
-        // TODO: Rename and change types and number of parameters
-        @JvmStatic
-        fun newInstance(param1: String, param2: String) =
-            GameFragment().apply {
-                arguments = Bundle().apply {
-                    putString(ARG_PARAM1, param1)
-                    putString(ARG_PARAM2, param2)
-                }
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        inicializarSonidos()
+        configurarBotones()
+        iniciarJuego()
+    }
+
+    private fun inicializarSonidos() {
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_GAME)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        soundPool = SoundPool.Builder().setMaxStreams(2).setAudioAttributes(audioAttributes).build()
+        idSonidoAcierto = soundPool.load(requireContext(), R.raw.sonido_acierto, 1)
+        idSonidoError = soundPool.load(requireContext(), R.raw.sonido_error, 1)
+    }
+
+    private fun configurarBotones() {
+        binding.redButton.setOnClickListener { verificarRespuesta(R.color.game_red) }
+        binding.greenButton.setOnClickListener { verificarRespuesta(R.color.game_green) }
+        binding.blueButton.setOnClickListener { verificarRespuesta(R.color.game_blue) }
+        binding.yellowButton.setOnClickListener { verificarRespuesta(R.color.game_yellow) }
+    }
+
+    private fun iniciarJuego() {
+        score = 0
+        binding.scoreValueText.text = score.toString()
+        siguienteColor()
+        iniciarTimer()
+    }
+
+    private fun iniciarTimer() {
+        timer = object : CountDownTimer(30000, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val segundosRestantes = millisUntilFinished / 1000
+                binding.timeValueText.text = segundosRestantes.toString()
             }
+            override fun onFinish() {
+                // el tiempo se acabo, vamos a los resultados
+                // pasamos el puntaje como argumento
+                val action = GameFragmentDirections.actionGameFragmentToResultFragment(score)
+                findNavController().navigate(action)
+            }
+        }.start()
+    }
+
+    private fun siguienteColor() {
+        currentColorId = gameColors.random()
+        val colorReal = ContextCompat.getColor(requireContext(), currentColorId)
+        binding.colorToGuessView.setBackgroundColor(colorReal)
+
+        // aplicamos la animacion al cuadro de color
+        val anim = AnimationUtils.loadAnimation(requireContext(), R.anim.scale_up)
+        binding.colorToGuessView.startAnimation(anim)
+    }
+
+    private fun verificarRespuesta(colorSeleccionadoId: Int) {
+        if (colorSeleccionadoId == currentColorId) {
+            score++
+            binding.scoreValueText.text = score.toString()
+            soundPool.play(idSonidoAcierto, 1f, 1f, 0, 0, 1f)
+        } else {
+            soundPool.play(idSonidoError, 1f, 1f, 0, 0, 1f)
+        }
+        siguienteColor()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // es importante cancelar el timer para evitar que siga corriendo
+        if (::timer.isInitialized) {
+            timer.cancel()
+        }
+        _binding = null
     }
 }
