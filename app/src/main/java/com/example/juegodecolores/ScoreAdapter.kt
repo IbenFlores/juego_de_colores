@@ -14,7 +14,7 @@ class ScoreAdapter(private val scores: List<Int>) : RecyclerView.Adapter<ScoreAd
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ScoreViewHolder {
-        // creamos (inflamos) la vista de la fila a partir de nuestro xml
+        // creamos la vista de la fila a partir de nuestro xml
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.score_list_item, parent, false)
         return ScoreViewHolder(view)
